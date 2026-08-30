@@ -1,6 +1,7 @@
 import os
+from typing import Optional
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -8,9 +9,12 @@ from fastapi.staticfiles import StaticFiles
 from app.api.v1.router import api_v1_router
 from app.api.v1.profile import router as profile_router
 from app.api.v1.health import router as health_router
+from app.api.deps import get_linkedin_service
+from app.schemas.profile import ProfileResponse
+from app.schemas.request import ProfileRequest
+from app.services.linkedin_client import LinkedInScraperService, linkedin_service
 from app.core.config import settings
 from app.core.logging import logger
-from app.services.linkedin_client import linkedin_service
 
 
 @asynccontextmanager
@@ -90,16 +94,26 @@ def create_app() -> FastAPI:
             return FileResponse(docs_path, media_type="text/html")
         return HTMLResponse("<h1>API Documentation</h1><p>Visit <a href='/openapi.json'>/openapi.json</a></p>")
 
-    # Root route: Content-negotiated (HTML for browsers, JSON for API clients & cURL)
+    # Root route: Content-negotiated + Direct Extraction
     @app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
-    async def root_endpoint(request: Request):
+    async def root_endpoint(
+        request: Request,
+        url: Optional[str] = None,
+        force_refresh: bool = False,
+        service: LinkedInScraperService = Depends(get_linkedin_service),
+    ):
+        # If url query parameter is provided (e.g. ?url=satyanadella), extract immediately
+        if url:
+            from app.api.v1.profile import extract_profile_get
+            return await extract_profile_get(url=url, force_refresh=force_refresh, service=service)
+
         accept = request.headers.get("accept", "")
-        # If requested by a web browser, serve the visual playground
+        # If requested by a web browser without query params, serve the visual playground
         if "text/html" in accept and not request.url.query:
             index_path = os.path.join(static_dir, "index.html")
             if os.path.exists(index_path):
                 return FileResponse(index_path, media_type="text/html")
-        
+
         # For API clients, cURL, automated graders, or JSON requests: return pure API JSON
         return JSONResponse({
             "service": settings.PROJECT_NAME,
@@ -117,6 +131,15 @@ def create_app() -> FastAPI:
                 "body": {"url": "https://www.linkedin.com/in/satyanadella"}
             }
         })
+
+    # Direct extraction on root POST for top-level domain submissions
+    @app.post("/", response_model=ProfileResponse, include_in_schema=False)
+    async def root_post_extract(
+        request: ProfileRequest,
+        service: LinkedInScraperService = Depends(get_linkedin_service),
+    ) -> ProfileResponse:
+        from app.api.v1.profile import extract_profile_post
+        return await extract_profile_post(request=request, service=service)
 
     # Dedicated Web Playground UI route at /ui
     @app.get("/ui", response_class=HTMLResponse, include_in_schema=False)
