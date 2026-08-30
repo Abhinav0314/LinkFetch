@@ -79,15 +79,15 @@ def create_app() -> FastAPI:
     app.include_router(api_v1_router, prefix=settings.API_PREFIX)
 
     # Interactive API Documentation Portal at /docs
-    @app.get("/docs", response_class=HTMLResponse, include_in_schema=False)
+    @app.api_route("/docs", methods=["GET", "HEAD"], response_class=HTMLResponse, include_in_schema=False)
     async def serve_docs():
         docs_path = os.path.join(static_dir, "docs.html")
         if os.path.exists(docs_path):
             return FileResponse(docs_path, media_type="text/html")
         return HTMLResponse("<h1>API Documentation</h1><p>Visit <a href='/openapi.json'>/openapi.json</a></p>")
 
-    # Root route serving Web Playground UI
-    @app.get("/", response_class=HTMLResponse, include_in_schema=False)
+    # Root route serving Web Playground UI & Render health ping
+    @app.api_route("/", methods=["GET", "HEAD"], response_class=HTMLResponse, include_in_schema=False)
     async def serve_playground():
         index_path = os.path.join(static_dir, "index.html")
         if os.path.exists(index_path):
@@ -95,7 +95,7 @@ def create_app() -> FastAPI:
         return HTMLResponse("<h1>LinkFetch API is Running</h1><p>Visit <a href='/docs'>/docs</a></p>")
 
     # Favicon route
-    @app.get("/favicon.ico", include_in_schema=False)
+    @app.api_route("/favicon.ico", methods=["GET", "HEAD"], include_in_schema=False)
     async def favicon():
         favicon_path = os.path.join(static_dir, "favicon.svg")
         if os.path.exists(favicon_path):

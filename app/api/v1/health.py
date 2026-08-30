@@ -7,8 +7,9 @@ from app.services.cache import CacheService
 router = APIRouter(prefix="/health", tags=["Health & Diagnostics"])
 
 
-@router.get(
+@router.api_route(
     "",
+    methods=["GET", "HEAD"],
     summary="API Health and Diagnostics",
     description="Returns the status of the API, cache performance metrics, and LinkedIn session health.",
 )

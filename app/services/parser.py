@@ -68,7 +68,7 @@ class PublicProfileParser:
 
     @staticmethod
     def parse(html_content: str, public_id: str, profile_url: str) -> ProfileData:
-        soup = BeautifulSoup(html_content, "lxml")
+        soup = BeautifulSoup(html_content, "html.parser")
 
         # 1. Extract Schema.org JSON-LD scripts (supporting root object, lists, and @graph structures)
         json_ld_data: Dict[str, Any] = {}
