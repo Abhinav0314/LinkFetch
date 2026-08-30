@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LinkFetch</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            serif: ['"Instrument Serif"', 'Georgia', 'serif'],
+            sans: ['"Inter"', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            base: {
+              bg: '#f5f1eb',
+              card: '#faf8f5',
+              elevated: '#ffffff',
+              border: '#e8e2d9',
+              'border-light': '#eee9e1',
+            },
+            ink: {
+              DEFAULT: '#2c2520',
+              secondary: '#6b5e52',
+              muted: '#9a8d80',
+              faint: '#beb3a5',
+            },
+            rust: {
+              DEFAULT: '#b8503a',
+              light: '#c96b55',
+              dark: '#973f2d',
+              bg: '#b8503a0a',
+              'bg-hover': '#b8503a12',
+              border: '#b8503a22',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    html { scroll-behavior: smooth; overflow-x: hidden; }
+    ::selection { background: #b8503a20; color: #2c2520; }
+    body { -webkit-font-smoothing: antialiased; overflow-x: hidden; max-width: 100vw; }
+    .card { background: #faf8f5; border: 1px solid #e8e2d9; border-radius: 16px; }
+    .card-inset { background: #f5f1eb; border: 1px solid #eee9e1; border-radius: 12px; }
+    .shadow-card { box-shadow: 0 1px 2px rgba(44,37,32,0.03), 0 4px 16px rgba(44,37,32,0.03); }
+    .shadow-card-lg { box-shadow: 0 2px 4px rgba(44,37,32,0.04), 0 8px 24px rgba(44,37,32,0.05); }
+    .btn-primary { background: #b8503a; color: white; transition: all 0.2s ease; }
+    .btn-primary:hover { background: #973f2d; box-shadow: 0 4px 12px #b8503a28; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .input-field {
+      background: #f5f1eb;
+      border: 1px solid #e8e2d9;
+      transition: all 0.15s ease;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .input-field:focus {
+      outline: none;
+      border-color: #b8503a66;
+      box-shadow: 0 0 0 3px #b8503a12;
+      background: #faf8f5;
+    }
+    .tag-pill { background: #f5f1eb; border: 1px solid #e8e2d9; color: #6b5e52; transition: all 0.15s; cursor: pointer; }
+    .tag-pill:hover { background: #b8503a08; border-color: #b8503a33; color: #b8503a; }
+    .tab-active { background: #faf8f5; color: #2c2520; box-shadow: 0 1px 2px rgba(0,0,0,0.04); border: 1px solid #e8e2d9; }
+    .tab-idle { color: #9a8d80; }
+    .tab-idle:hover { color: #6b5e52; }
+    .fade-in { animation: fadeIn 0.35s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { animation: spin 0.7s linear infinite; }
+    pre { tab-size: 2; overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; scrollbar-width: none; -ms-overflow-style: none; }
+    pre::-webkit-scrollbar,
+    .overflow-x-auto::-webkit-scrollbar,
+    .modal-body::-webkit-scrollbar {
+      display: none;
+      width: 0;
+      height: 0;
+    }
+    .overflow-x-auto,
+    .modal-body {
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .modal-backdrop { position:fixed;inset:0;z-index:100;background:rgba(44,37,32,0.35);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:16px;animation:fadeIn 0.2s ease-out; }
+    .modal-content { background:#faf8f5;border:1px solid #e8e2d9;border-radius:20px;box-shadow:0 8px 32px rgba(44,37,32,0.12);width:100%;max-width:600px;max-height:80vh;display:flex;flex-direction:column;animation:fadeIn 0.25s ease-out; }
+    .modal-header { padding:20px 24px 16px;border-bottom:1px solid #eee9e1;display:flex;align-items:center;justify-content:space-between;flex-shrink:0; }
+    .modal-body { padding:16px 24px 24px;overflow-y:auto;flex:1; }
+    .show-all-btn { display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:10px;font-size:12px;font-weight:500;cursor:pointer;transition:all 0.15s;background:#f0ece3;border:1px solid #e8e2d9;color:#6b5e52;margin-top:10px; }
+    .show-all-btn:hover { background:#b8503a0a;border-color:#b8503a33;color:#b8503a; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col font-sans" style="background: #f5f1eb; color: #2c2520;">
+
+  <!-- Navbar -->
+  <nav class="fixed top-0 left-0 right-0 z-40 border-b" style="background: rgba(250,248,245,0.92); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-color: #e8e2d9;">
+    <div class="max-w-6xl mx-auto px-4 sm:px-5 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <a href="/" onclick="resetHome(event)" class="flex items-center gap-2.5 sm:gap-3 group text-decoration-none cursor-pointer">
+          <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm transition-transform group-hover:scale-105" style="background: #b8503a;">
+            <i class="fa-brands fa-linkedin-in text-sm"></i>
+          </div>
+          <div>
+            <span class="font-serif text-lg leading-tight block" style="color: #2c2520;">LinkFetch</span>
+          </div>
+        </a>
+      </div>
+      <div class="flex items-center gap-2">
+        <a href="/docs" target="_blank" class="flex items-center text-xs font-medium px-3 py-1.5 rounded-lg border transition" style="color: #6b5e52; border-color: #e8e2d9; background: #faf8f5;" onmouseover="this.style.borderColor='#d5cdc2'; this.style.color='#2c2520';" onmouseout="this.style.borderColor='#e8e2d9'; this.style.color='#6b5e52';">
+          <span>Docs</span>
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-5 pt-[78px] pb-16 min-w-0">
+
+    <!-- Hero -->
+    <div class="max-w-xl mb-10">
+      <h2 class="font-serif leading-[1.12] mb-3" style="font-size: clamp(2.2rem, 5vw, 3rem); color: #2c2520;">
+        Extract any<br><em style="color: #b8503a;">LinkedIn profile.</em>
+      </h2>
+      <p class="text-[15px] leading-relaxed max-w-md" style="color: #6b5e52;">
+        Accepts any format: direct username, <code class="font-mono text-xs px-1.5 py-0.5 rounded bg-amber-100/60 text-amber-900">username</code>, <code class="font-mono text-xs px-1.5 py-0.5 rounded bg-amber-100/60 text-amber-900">/username</code>, or full LinkedIn URL.
+      </p>
+    </div>
+
+    <!-- Search Card -->
+    <div class="card shadow-card p-5 mb-4">
+      <form id="extractForm" class="space-y-3.5">
+        <div class="flex flex-col sm:flex-row gap-3">
+          <div class="relative flex-1">
+            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-sand-400" style="color: #a99d8a;">
+              <i class="fa-solid fa-link text-sm"></i>
+            </div>
+            <input 
+              type="text" 
+              id="profileUrl" 
+              name="url" 
+              required
+              autocomplete="off"
+              autocorrect="off"
+              autocapitalize="off"
+              spellcheck="false"
+              placeholder="Enter username or https://www.linkedin.com/in/username"
+              class="w-full pl-11 pr-10 py-3 input-field rounded-xl font-mono text-sm" 
+              style="color: #2c2520;"
+              oninput="toggleClearBtn()"
+            >
+            <button 
+              type="button" 
+              id="clearInputBtn" 
+              onclick="clearSearchInput()" 
+              class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-xs text-sand-400 hover:text-sand-700 hidden cursor-pointer transition"
+              style="color: #a99d8a;"
+              title="Clear input"
+            >
+              <i class="fa-solid fa-circle-xmark text-sm"></i>
+            </button>
+          </div>
+          <button type="submit" id="submitBtn"
+            class="btn-primary px-6 py-3 font-semibold rounded-xl flex items-center justify-center gap-2 text-sm cursor-pointer whitespace-nowrap">
+            <i class="fa-solid fa-arrow-right text-xs"></i>
+            <span>Extract</span>
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Loading -->
+    <div id="loadingState" class="hidden flex-col items-center justify-center gap-4 py-20 fade-in" style="display:none;">
+      <div class="w-8 h-8 border-2 rounded-full spinner" style="border-color: #e8e2d9; border-top-color: #b8503a;"></div>
+      <p class="text-sm" style="color: #9a8d80;">Extracting profile data…</p>
+    </div>
+
+    <!-- Error -->
+    <div id="errorState" class="hidden rounded-2xl p-5 mb-5 fade-in" style="background: #fdf0ee; border: 1px solid #f0cec7;">
+      <div class="flex items-start gap-3">
+        <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 text-xs" style="background: #f9ddd7; color: #b8503a;">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div>
+          <h3 class="font-semibold text-sm" id="errorTitle" style="color: #8b3325;">Extraction Failed</h3>
+          <p class="text-sm mt-0.5" id="errorMessage" style="color: #b8503a;"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div id="resultsSection" class="hidden space-y-5 fade-in">
+
+      <!-- Meta Bar -->
+      <div class="flex flex-wrap items-center justify-between gap-3 px-0.5">
+        <div class="flex items-center gap-4 text-xs" style="color: #9a8d80;">
+          <span class="flex items-center gap-1.5">
+            <i class="fa-regular fa-clock" style="color: #beb3a5;"></i>
+            <span id="metaLatency">--</span>
+          </span>
+          <span class="flex items-center gap-1.5">
+            <i class="fa-solid fa-route" style="color: #beb3a5;"></i>
+            <span class="uppercase font-medium" style="color: #b8503a;" id="metaStrategy">--</span>
+          </span>
+          <span class="flex items-center gap-1.5">
+            <i class="fa-solid fa-database" style="color: #beb3a5;"></i>
+            <span id="metaCached">--</span>
+          </span>
+          <button 
+            type="button" 
+            onclick="triggerForceRefresh()" 
+            class="flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md border transition cursor-pointer hover:border-sand-400"
+            style="background: #faf8f5; border-color: #e8e2d9; color: #b8503a;"
+            title="Bypass cache and fetch fresh live data from LinkedIn"
+          >
+            <i class="fa-solid fa-rotate text-[10px]"></i>
+            <span>Refresh Live</span>
+          </button>
+        </div>
+        <div class="flex items-center gap-0.5 p-0.5 rounded-lg" style="background: #ede8e0; border: 1px solid #e8e2d9;">
+          <button id="tabVisualBtn" onclick="switchTab('visual')" class="px-3 py-1 rounded-md text-xs font-medium tab-active">Profile</button>
+          <button id="tabJsonBtn" onclick="switchTab('json')" class="px-3 py-1 rounded-md text-xs font-medium tab-idle">JSON</button>
+          <button id="tabCurlBtn" onclick="switchTab('curl')" class="px-3 py-1 rounded-md text-xs font-medium tab-idle">cURL</button>
+        </div>
+      </div>
+
+      <!-- Tab: Visual -->
+      <div id="tabVisual" class="space-y-5">
+        <div class="card shadow-card-lg overflow-hidden">
+          <div class="w-full relative aspect-[4/1] min-h-[140px] sm:min-h-[180px] overflow-hidden" id="headerBanner" style="background: linear-gradient(135deg, #e8e2d9 0%, #f0ece3 50%, #f5f1eb 100%);">
+            <img id="bgImg" class="w-full h-full object-cover object-center hidden" alt="Header Banner">
+          </div>
+          <div class="px-5 sm:px-8 pb-6 relative">
+            <!-- Top Row: Avatar overlapping banner + CTA Button -->
+            <div class="flex items-end justify-between gap-4 -mt-12 sm:-mt-16 mb-4">
+              <div class="w-22 h-22 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shadow-md flex-shrink-0 flex items-center justify-center text-2xl sm:text-3xl" id="avatarContainer" style="background: #ede8e0; border: 3.5px solid #faf8f5; color: #beb3a5;">
+                <i class="fa-solid fa-user"></i>
+              </div>
+              <a id="profileLink" href="#" target="_blank" class="inline-flex items-center justify-center gap-1.5 px-4 py-2 sm:py-2.5 text-white text-xs font-semibold rounded-xl sm:rounded-lg transition flex-shrink-0 shadow-sm" style="background: #2c2520;" onmouseover="this.style.background='#443a33'" onmouseout="this.style.background='#2c2520'">
+                <i class="fa-brands fa-linkedin text-[11px]"></i>
+                <span>View on LinkedIn</span>
+              </a>
+            </div>
+
+            <!-- Profile Identity: Name & Headline (Strictly below the banner image) -->
+            <div class="space-y-1 mb-5">
+              <h2 class="font-serif text-2xl sm:text-3xl font-normal leading-tight" id="profileName" style="color: #2c2520;">--</h2>
+              <p class="text-xs sm:text-sm leading-snug" id="profileHeadline" style="color: #6b5e52;">--</p>
+            </div>
+
+            <!-- Meta Bar -->
+            <div class="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs pt-4" style="border-top: 1px solid #eee9e1; color: #9a8d80;">
+              <span class="flex items-center gap-1.5" id="locContainer">
+                <i class="fa-solid fa-location-dot text-[11px]" style="color: #b8503a;"></i>
+                <span id="profileLocation" class="font-medium" style="color: #6b5e52;">--</span>
+              </span>
+              <span class="flex items-center gap-1.5">
+                <i class="fa-solid fa-at text-[11px]" style="color: #beb3a5;"></i>
+                <code class="font-mono text-[11px] font-semibold" style="color: #b8503a;" id="profileId">--</code>
+              </span>
+            </div>
+
+            <!-- About Section -->
+            <div id="aboutSection" class="mt-5 pt-4" style="border-top: 1px solid #eee9e1;">
+              <h3 class="text-[10px] font-bold uppercase tracking-widest mb-2" style="color: #beb3a5;">About</h3>
+              <p class="text-xs sm:text-sm leading-relaxed whitespace-pre-line" id="profileAbout" style="color: #6b5e52;">--</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Experience & Education -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div class="card shadow-card p-6">
+            <div class="flex items-center gap-2.5 mb-5">
+              <div class="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style="background: #fef5ec; border: 1px solid #f5e2cc; color: #c07a2e;">
+                <i class="fa-solid fa-briefcase"></i>
+              </div>
+              <h3 class="font-serif text-lg" style="color: #2c2520;">Experience</h3>
+            </div>
+            <div id="experienceList" class="space-y-3">
+              <p class="text-xs italic" style="color: #beb3a5;">No experience data available.</p>
+            </div>
+          </div>
+          <div class="card shadow-card p-6">
+            <div class="flex items-center gap-2.5 mb-5">
+              <div class="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style="background: #eef3fd; border: 1px solid #d4dff4; color: #4a6fa5;">
+                <i class="fa-solid fa-graduation-cap"></i>
+              </div>
+              <h3 class="font-serif text-lg" style="color: #2c2520;">Education</h3>
+            </div>
+            <div id="educationList" class="space-y-3">
+              <p class="text-xs italic" style="color: #beb3a5;">No education data available.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Skills / Certs / Languages -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div class="card shadow-card p-5">
+            <div class="flex items-center gap-2.5 mb-4">
+              <div class="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style="background:#f0f7f0;border:1px solid #d4e8d4;color:#4a8c5c;">
+                <i class="fa-solid fa-shapes"></i>
+              </div>
+              <h3 class="font-serif text-base" style="color:#2c2520;">Skills</h3>
+              <span id="skillsCount" class="text-[10px] font-mono px-1.5 py-0.5 rounded-md" style="background:#f0ece3;color:#9a8d80;"></span>
+            </div>
+            <div id="skillsList" class="flex flex-wrap gap-1.5">
+              <p class="text-xs italic" style="color: #beb3a5;">None listed.</p>
+            </div>
+          </div>
+          <div class="card shadow-card p-5">
+            <div class="flex items-center gap-2.5 mb-4">
+              <div class="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style="background:#fef5ec;border:1px solid #f5e2cc;color:#c07a2e;">
+                <i class="fa-solid fa-award"></i>
+              </div>
+              <h3 class="font-serif text-base" style="color:#2c2520;">Certifications</h3>
+              <span id="certsCount" class="text-[10px] font-mono px-1.5 py-0.5 rounded-md" style="background:#f0ece3;color:#9a8d80;"></span>
+            </div>
+            <div id="certList" class="space-y-2">
+              <p class="text-xs italic" style="color: #beb3a5;">None listed.</p>
+            </div>
+          </div>
+          <div class="card shadow-card p-5">
+            <div class="flex items-center gap-2.5 mb-4">
+              <div class="w-7 h-7 rounded-lg flex items-center justify-center text-xs" style="background:#eef0fd;border:1px solid #d4d9f4;color:#5a5fa5;">
+                <i class="fa-solid fa-language"></i>
+              </div>
+              <h3 class="font-serif text-base" style="color:#2c2520;">Languages</h3>
+              <span id="langsCount" class="text-[10px] font-mono px-1.5 py-0.5 rounded-md" style="background:#f0ece3;color:#9a8d80;"></span>
+            </div>
+            <div id="langList" class="space-y-2">
+              <p class="text-xs italic" style="color: #beb3a5;">None listed.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: JSON -->
+      <div id="tabJson" class="hidden">
+        <div class="card shadow-card-lg overflow-hidden">
+          <div class="px-5 py-2.5 flex items-center justify-between" style="background: #f0ece3; border-bottom: 1px solid #e8e2d9;">
+            <span class="text-[11px] font-mono" style="color: #9a8d80;">response.json</span>
+            <button onclick="copyJson()" class="px-3 py-1 text-xs font-medium rounded-md border flex items-center gap-1.5 transition cursor-pointer" style="background: #faf8f5; border-color: #e8e2d9; color: #6b5e52;">
+              <i class="fa-regular fa-copy text-[10px]"></i>
+              <span id="copyBtnText">Copy</span>
+            </button>
+          </div>
+          <pre class="p-5 text-xs font-mono overflow-x-auto max-h-[550px] leading-relaxed" id="jsonViewer" style="color: #6b5e52; background: #faf8f5;">--</pre>
+        </div>
+      </div>
+
+      <!-- Tab: cURL -->
+      <div id="tabCurl" class="hidden">
+        <div class="card shadow-card p-6 space-y-5">
+          <h3 class="font-serif text-lg" style="color: #2c2520;">Usage Examples</h3>
+          <div class="space-y-2">
+            <span class="text-[10px] font-mono uppercase tracking-widest" style="color: #beb3a5;">POST</span>
+            <pre class="p-4 rounded-xl text-xs font-mono overflow-x-auto" id="curlPost" style="background: #f0ece3; border: 1px solid #e8e2d9; color: #6b5e52;">--</pre>
+          </div>
+          <div class="space-y-2">
+            <span class="text-[10px] font-mono uppercase tracking-widest" style="color: #beb3a5;">GET</span>
+            <pre class="p-4 rounded-xl text-xs font-mono overflow-x-auto" id="curlGet" style="background: #f0ece3; border: 1px solid #e8e2d9; color: #6b5e52;">--</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer style="border-top: 1px solid #e8e2d9; background: #f5f1eb;" class="mt-auto py-6">
+    <div class="max-w-6xl mx-auto px-4 sm:px-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs" style="color: #9a8d80;">
+      <p><strong style="color: #6b5e52;">LinkFetch API</strong></p>
+      <div class="flex items-center gap-4">
+        <a href="/docs" class="hover:opacity-70 transition">API Docs</a>
+        <a href="/openapi.json" target="_blank" class="hover:opacity-70 transition">OpenAPI JSON</a>
+        <a href="/api/v1/health" class="hover:opacity-70 transition">Health</a>
+      </div>
+    </div>
+  </footer>
+
+  <div id="detailModal" class="modal-backdrop" style="display:none;" onclick="if(event.target===this)closeModal()">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="font-serif text-lg" id="modalTitle" style="color:#2c2520;"></h3>
+        <button onclick="closeModal()" class="w-7 h-7 rounded-lg flex items-center justify-center text-xs cursor-pointer transition" style="color:#9a8d80;background:#f0ece3;border:1px solid #e8e2d9;" onmouseover="this.style.color='#b8503a'" onmouseout="this.style.color='#9a8d80'">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
+  <script>
+    let rawApiResponse = null;
+    function stripEmojis(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/[\p{Extended_Pictographic}\uFE0E\uFE0F\u200D\u200E\u200F\u25AA-\u25FE\u2022\u2023\u25E6\u2043\u2219\u2700-\u27BF]/gu, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .replace(/^[\s·\-–—|•▪]+|[\s·\-–—|•▪]+$/g, '');
+    }
+
+    function esc(s) { if(!s) return ''; const d=document.createElement('div'); d.textContent=stripEmojis(s); return d.innerHTML; }
+
+    function openModal(title, contentHtml) {
+      document.getElementById('modalTitle').textContent = title;
+      document.getElementById('modalBody').innerHTML = contentHtml;
+      document.getElementById('detailModal').style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+    }
+    function closeModal() {
+      document.getElementById('detailModal').style.display = 'none';
+      document.body.style.overflow = '';
+    }
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+    function switchTab(tab) {
+      ['Visual','Json','Curl'].forEach(t => {
+        document.getElementById('tab'+t).classList.add('hidden');
+        document.getElementById('tab'+t+'Btn').className = "px-3 py-1 rounded-md text-xs font-medium tab-idle";
+      });
+      const cap = tab.charAt(0).toUpperCase() + tab.slice(1);
+      document.getElementById('tab'+cap).classList.remove('hidden');
+      document.getElementById('tab'+cap+'Btn').className = "px-3 py-1 rounded-md text-xs font-medium tab-active";
+    }
+
+    function copyJson() {
+      if (!rawApiResponse) return;
+      navigator.clipboard.writeText(JSON.stringify(rawApiResponse, null, 2)).then(() => {
+        const b = document.getElementById('copyBtnText');
+        b.textContent = "Copied!"; setTimeout(() => b.textContent = "Copy", 1500);
+      });
+    }
+
+    function toggleClearBtn() {
+      const input = document.getElementById('profileUrl');
+      const btn = document.getElementById('clearInputBtn');
+      if (input && btn) {
+        if (input.value.trim().length > 0) {
+          btn.classList.remove('hidden');
+        } else {
+          btn.classList.add('hidden');
+        }
+      }
+    }
+
+    function clearSearchInput() {
+      const input = document.getElementById('profileUrl');
+      if (input) {
+        input.value = '';
+        input.focus();
+        toggleClearBtn();
+      }
+    }
+
+    function resetHome(e) {
+      if (e) e.preventDefault();
+      try {
+        localStorage.clear();
+        window.history.replaceState({}, '', window.location.pathname);
+      } catch (_) {}
+
+      clearSearchInput();
+      document.getElementById('resultsSection').classList.add('hidden');
+      document.getElementById('errorState').classList.add('hidden');
+      const loader = document.getElementById('loadingState');
+      if (loader) { loader.classList.add('hidden'); loader.style.display = 'none'; }
+      document.getElementById('submitBtn').disabled = false;
+      document.querySelectorAll('template[id^="_"]').forEach(t => t.remove());
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // Clear any legacy persisted state so localhost:8000 always starts completely fresh
+      try {
+        localStorage.removeItem('last_searched_url');
+        if (window.location.search) {
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+      } catch (_) {}
+      toggleClearBtn();
+    });
+
+    async function executeProfileFetch(forceRefresh = false) {
+      const urlInput = document.getElementById('profileUrl').value.trim();
+      if (!urlInput) return;
+
+      document.getElementById('resultsSection').classList.add('hidden');
+      document.getElementById('errorState').classList.add('hidden');
+      const loader = document.getElementById('loadingState');
+      loader.classList.remove('hidden'); loader.style.display = 'flex';
+      document.getElementById('submitBtn').disabled = true;
+
+      try {
+        const res = await fetch('/api/v1/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            url: urlInput,
+            force_refresh: forceRefresh 
+          })
+        });
+        const json = await res.json();
+        rawApiResponse = json;
+        if (!res.ok || !json.success) throw new Error(json.detail || json.error || 'Failed to fetch profile.');
+        renderProfile(json);
+      } catch (err) {
+        document.getElementById('errorTitle').textContent = "Extraction Error";
+        document.getElementById('errorMessage').textContent = err.message || "Unexpected error.";
+        document.getElementById('errorState').classList.remove('hidden');
+      } finally {
+        const loader = document.getElementById('loadingState');
+        loader.classList.add('hidden'); loader.style.display = 'none';
+        document.getElementById('submitBtn').disabled = false;
+      }
+    }
+
+    function triggerForceRefresh() {
+      executeProfileFetch(true);
+    }
+
+    document.getElementById('extractForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      executeProfileFetch(false);
+    });
+
+    function renderProfile(res) {
+      document.querySelectorAll('template[id^="_"]').forEach(t => t.remove());
+      const p = res.data, m = res.metadata;
+      document.getElementById('metaLatency').textContent = m.execution_time_ms + 'ms';
+      document.getElementById('metaStrategy').textContent = m.strategy_used.replace(/_/g, ' ');
+      document.getElementById('metaCached').textContent = m.cached ? 'cached' : 'live';
+      document.getElementById('profileName').textContent = stripEmojis(p.full_name || p.public_id);
+      document.getElementById('profileHeadline').textContent = stripEmojis(p.headline || '');
+      document.getElementById('profileLocation').textContent = stripEmojis(p.location?.raw || p.location?.city || '—');
+      document.getElementById('profileId').textContent = p.public_id;
+      document.getElementById('profileLink').href = p.profile_url;
+
+      const ac = document.getElementById('avatarContainer');
+      ac.innerHTML = p.profile_picture_url
+        ? '<img src="'+esc(p.profile_picture_url)+'" class="w-full h-full object-cover" alt="'+esc(p.full_name)+'">'
+        : '<i class="fa-solid fa-user"></i>';
+
+      const bg = document.getElementById('bgImg');
+      if (p.background_picture_url) { bg.src = p.background_picture_url; bg.classList.remove('hidden'); }
+      else bg.classList.add('hidden');
+
+      const as = document.getElementById('aboutSection');
+      if (p.about) { document.getElementById('profileAbout').textContent = stripEmojis(p.about); as.classList.remove('hidden'); }
+      else as.classList.add('hidden');
+
+      // Sort experience reverse-chronologically (Current first, then newest start/end dates)
+      if (p.experience?.length) {
+        p.experience.sort((a, b) => {
+          if (a.is_current && !b.is_current) return -1;
+          if (!a.is_current && b.is_current) return 1;
+          const aEnd = a.is_current ? 999999 : ((a.end_date?.year || 0) * 100 + (a.end_date?.month || 0));
+          const bEnd = b.is_current ? 999999 : ((b.end_date?.year || 0) * 100 + (b.end_date?.month || 0));
+          if (bEnd !== aEnd) return bEnd - aEnd;
+          const aStart = (a.start_date?.year || 0) * 100 + (a.start_date?.month || 0);
+          const bStart = (b.start_date?.year || 0) * 100 + (b.start_date?.month || 0);
+          return bStart - aStart;
+        });
+      }
+
+      // Sort education reverse-chronologically (Newest graduation first)
+      if (p.education?.length) {
+        p.education.sort((a, b) => {
+          const aEnd = a.end_year || a.end_date?.year || a.start_year || a.start_date?.year || 0;
+          const bEnd = b.end_year || b.end_date?.year || b.start_year || b.start_date?.year || 0;
+          return bEnd - aEnd;
+        });
+      }
+
+      // Experience
+      const el = document.getElementById('experienceList');
+      if (p.experience?.length) {
+        const expCard = (x) => {
+          const sStr = fd(x.start_date);
+          const eStr = x.is_current ? 'Present' : fd(x.end_date);
+          let dateHtml = '';
+          if (sStr && eStr) dateHtml = `<span><i class="fa-regular fa-calendar text-[10px] mr-1" style="color:#beb3a5;"></i>${esc(sStr)} – ${esc(eStr)}</span>`;
+          else if (sStr) dateHtml = `<span><i class="fa-regular fa-calendar text-[10px] mr-1" style="color:#beb3a5;"></i>${esc(sStr)} – Present</span>`;
+          else if (eStr && eStr !== 'Present') dateHtml = `<span><i class="fa-regular fa-calendar text-[10px] mr-1" style="color:#beb3a5;"></i>${esc(eStr)}</span>`;
+          else if (x.is_current) dateHtml = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">Current</span>`;
+
+          return `
+          <div class="card-inset flex items-start gap-3.5 p-3.5 sm:p-4 rounded-xl transition hover:border-[#d5cdc2]">
+            <div class="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden text-sm" style="background:#faf8f5;border:1px solid #e8e2d9;color:#beb3a5;">
+              ${x.company_logo_url ? '<img src="'+esc(x.company_logo_url)+'" class="w-full h-full object-contain p-1 rounded-lg" alt="'+esc(x.company_name)+'">' : '<i class="fa-solid fa-building"></i>'}
+            </div>
+            <div class="flex-1 min-w-0">
+              <h4 class="font-semibold text-[13.5px] sm:text-sm leading-snug break-words" style="color:#2c2520;">${esc(x.title || 'Position')}</h4>
+              ${x.company_name && x.company_name !== x.title ? '<p class="text-xs font-medium mt-0.5" style="color:#b8503a;">'+esc(x.company_name)+'</p>' : ''}
+              <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] mt-1" style="color:#9a8d80;">
+                ${dateHtml}
+                ${dateHtml && x.location ? '<span style="color:#d5cdc2;">·</span>' : ''}
+                ${x.location ? '<span>'+esc(x.location)+'</span>' : ''}
+              </div>
+              ${x.description ? '<p class="text-xs mt-2 line-clamp-2 leading-relaxed" style="color:#6b5e52;">'+esc(x.description)+'</p>' : ''}
+            </div>
+          </div>`;
+        };
+
+        // Show only Current positions in main card, or top 1 if none are flagged current
+        const currentPositions = p.experience.filter(x => x.is_current);
+        const displayed = currentPositions.length > 0 ? currentPositions : p.experience.slice(0, 1);
+
+        el.innerHTML = displayed.map(expCard).join('');
+        if (p.experience.length > displayed.length) {
+          el.innerHTML += `<button class="show-all-btn" onclick="openModal('All Experience · ${p.experience.length}', document.getElementById('_expAll').innerHTML)"><i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> Show all ${p.experience.length} experiences</button>`;
+          const hidden = document.createElement('template'); hidden.id = '_expAll';
+          hidden.innerHTML = '<div class="space-y-3">' + p.experience.map(expCard).join('') + '</div>';
+          document.body.appendChild(hidden);
+        }
+      } else el.innerHTML = '<p class="text-xs italic" style="color:#beb3a5;">No experience data available.</p>';
+
+      // Education
+      const ed = document.getElementById('educationList');
+      if (p.education?.length) {
+        const eduCard = (x) => {
+          let dateStr = '';
+          const sStr = fd(x.start_year || x.start_date);
+          const eStr = fd(x.end_year || x.end_date);
+          if (sStr && eStr) dateStr = `${sStr} – ${eStr}`;
+          else if (sStr) dateStr = `${sStr} – Present`;
+          else if (eStr) dateStr = `${eStr}`;
+
+          return `
+          <div class="card-inset flex items-start gap-3.5 p-3.5 sm:p-4 rounded-xl transition hover:border-[#d5cdc2]">
+            <div class="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden text-sm" style="background:#faf8f5;border:1px solid #e8e2d9;color:#beb3a5;">
+              ${x.school_logo_url ? '<img src="'+esc(x.school_logo_url)+'" class="w-full h-full object-contain p-1 rounded-lg" alt="'+esc(x.school_name)+'">' : '<i class="fa-solid fa-graduation-cap"></i>'}
+            </div>
+            <div class="flex-1 min-w-0">
+              <h4 class="font-semibold text-[13.5px] sm:text-sm leading-snug break-words" style="color:#2c2520;">${esc(x.school_name)}</h4>
+              ${x.degree_name || x.field_of_study ? `
+                <p class="text-xs leading-snug mt-0.5" style="color:#6b5e52;">
+                  ${x.degree_name ? '<span class="font-medium" style="color:#2c2520;">'+esc(x.degree_name)+'</span>' : ''}
+                  ${x.degree_name && x.field_of_study ? '<span style="color:#d5cdc2;"> · </span>' : ''}
+                  ${x.field_of_study ? '<span style="color:#6b5e52;">'+esc(x.field_of_study)+'</span>' : ''}
+                </p>
+              ` : ''}
+              ${dateStr ? '<p class="text-[11px] font-medium mt-1" style="color:#9a8d80;"><i class="fa-regular fa-calendar text-[10px] mr-1" style="color:#beb3a5;"></i>'+esc(dateStr)+'</p>' : ''}
+              ${x.grade ? '<p class="text-[11px] mt-0.5" style="color:#9a8d80;">Grade: '+esc(x.grade)+'</p>' : ''}
+              ${x.activities ? '<p class="text-xs mt-1.5 leading-relaxed line-clamp-2" style="color:#6b5e52;">'+esc(x.activities)+'</p>' : ''}
+            </div>
+          </div>`;
+        };
+        const limit = 2;
+        ed.innerHTML = p.education.slice(0, limit).map(eduCard).join('');
+        if (p.education.length > limit) {
+          ed.innerHTML += `<button class="show-all-btn" onclick="openModal('All Education · ${p.education.length}', document.getElementById('_eduAll').innerHTML)"><i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> Show all ${p.education.length} schools</button>`;
+          const hidden = document.createElement('template'); hidden.id = '_eduAll';
+          hidden.innerHTML = '<div class="space-y-3">' + p.education.map(eduCard).join('') + '</div>';
+          document.body.appendChild(hidden);
+        }
+      } else ed.innerHTML = '<p class="text-xs italic" style="color:#beb3a5;">No education data available.</p>';
+
+      // Skills
+      const sl = document.getElementById('skillsList');
+      document.getElementById('skillsCount').textContent = p.skills?.length ? p.skills.length : '';
+      if (p.skills?.length) {
+        const skillPill = (s) => `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs" style="background:#f0ece3;border:1px solid #e8e2d9;color:#6b5e52;">${esc(s.name)}${s.endorsement_count ? ' <span class="text-[10px] font-mono" style="color:#beb3a5;">'+s.endorsement_count+'</span>' : ''}</span>`;
+        const limit = 10;
+        sl.innerHTML = p.skills.slice(0, limit).map(skillPill).join('');
+        if (p.skills.length > limit) {
+          sl.innerHTML += `<button class="show-all-btn" onclick="openModal('Skills · ${p.skills.length}', document.getElementById('_skillAll').innerHTML)"><i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> +${p.skills.length - limit} more</button>`;
+          const hidden = document.createElement('template'); hidden.id = '_skillAll';
+          hidden.innerHTML = '<div class="flex flex-wrap gap-1.5">' + p.skills.map(skillPill).join('') + '</div>';
+          document.body.appendChild(hidden);
+        }
+      } else sl.innerHTML = '<p class="text-xs italic" style="color:#beb3a5;">None listed.</p>';
+
+      // Certs
+      const cl = document.getElementById('certList');
+      document.getElementById('certsCount').textContent = p.certifications?.length ? p.certifications.length : '';
+      if (p.certifications?.length) {
+        const certCard = (c) => `<div class="card-inset p-2 text-xs"><p class="font-semibold truncate" style="color:#2c2520;">${esc(c.name)}</p>${c.authority ? '<p class="text-[11px]" style="color:#9a8d80;">'+esc(c.authority)+'</p>' : ''}</div>`;
+        const limit = 3;
+        cl.innerHTML = p.certifications.slice(0, limit).map(certCard).join('');
+        if (p.certifications.length > limit) {
+          cl.innerHTML += `<button class="show-all-btn" onclick="openModal('Certifications · ${p.certifications.length}', document.getElementById('_certAll').innerHTML)"><i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> +${p.certifications.length - limit} more</button>`;
+          const hidden = document.createElement('template'); hidden.id = '_certAll';
+          hidden.innerHTML = '<div class="space-y-2">' + p.certifications.map(certCard).join('') + '</div>';
+          document.body.appendChild(hidden);
+        }
+      } else cl.innerHTML = '<p class="text-xs italic" style="color:#beb3a5;">None listed.</p>';
+
+      // Languages
+      const ll = document.getElementById('langList');
+      document.getElementById('langsCount').textContent = p.languages?.length ? p.languages.length : '';
+      if (p.languages?.length) {
+        const langCard = (l) => `<div class="card-inset flex justify-between items-center text-xs p-2"><span class="font-medium" style="color:#2c2520;">${esc(l.name)}</span><span class="text-[11px]" style="color:#9a8d80;">${esc(l.proficiency||'')}</span></div>`;
+        const limit = 3;
+        ll.innerHTML = p.languages.slice(0, limit).map(langCard).join('');
+        if (p.languages.length > limit) {
+          ll.innerHTML += `<button class="show-all-btn" onclick="openModal('Languages · ${p.languages.length}', document.getElementById('_langAll').innerHTML)"><i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> +${p.languages.length - limit} more</button>`;
+          const hidden = document.createElement('template'); hidden.id = '_langAll';
+          hidden.innerHTML = '<div class="space-y-2">' + p.languages.map(langCard).join('') + '</div>';
+          document.body.appendChild(hidden);
+        }
+      } else ll.innerHTML = '<p class="text-xs italic" style="color:#beb3a5;">None listed.</p>';
+
+      document.getElementById('jsonViewer').textContent = JSON.stringify(res, null, 2);
+      const h = window.location.origin;
+      document.getElementById('curlPost').textContent = 'curl -X POST "'+h+'/api/v1/profile" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"url": "'+p.profile_url+'"}\'';
+      document.getElementById('curlGet').textContent = 'curl "'+h+'/api/v1/profile?url='+encodeURIComponent(p.profile_url)+'"';
+      document.getElementById('resultsSection').classList.remove('hidden');
+    }
+
+    function fd(d) {
+      if (!d) return '';
+      const ms = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      
+      if (typeof d === 'number') {
+        return (d >= 1900 && d <= 2100) ? String(d) : '';
+      }
+
+      if (typeof d === 'string') {
+        const str = d.trim();
+        if (!str) return '';
+        if (/^\d{4}$/.test(str)) return str;
+        const isoMatch = str.match(/^(\d{4})[-/](\d{1,2})/);
+        if (isoMatch) {
+          const mIdx = parseInt(isoMatch[2], 10) - 1;
+          const mStr = (mIdx >= 0 && mIdx < 12) ? ms[mIdx] : '';
+          return mStr ? `${mStr} ${isoMatch[1]}` : isoMatch[1];
+        }
+        return str;
+      }
+
+      if (typeof d === 'object') {
+        const y = d.year || d.startYear || d.endYear;
+        const m = d.month || d.startMonth || d.endMonth;
+        if (y && m) {
+          const mIdx = (typeof m === 'number') ? m - 1 : parseInt(m, 10) - 1;
+          const mStr = (mIdx >= 0 && mIdx < 12) ? ms[mIdx] : String(m);
+          return `${mStr} ${y}`;
+        }
+        if (y) return String(y);
+      }
+      return '';
+    }
+  </script>
+</body>
+</html>

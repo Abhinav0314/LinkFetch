@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LinkFetch</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            serif: ['"Instrument Serif"', 'Georgia', 'serif'],
+            sans: ['"Inter"', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            base: {
+              bg: '#f5f1eb',
+              card: '#faf8f5',
+              elevated: '#ffffff',
+              border: '#e8e2d9',
+              'border-light': '#eee9e1',
+            },
+            ink: {
+              DEFAULT: '#2c2520',
+              secondary: '#6b5e52',
+              muted: '#9a8d80',
+              faint: '#beb3a5',
+            },
+            rust: {
+              DEFAULT: '#b8503a',
+              light: '#c96b55',
+              dark: '#973f2d',
+              bg: '#b8503a0a',
+              'bg-hover': '#b8503a12',
+              border: '#b8503a22',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    html { scroll-behavior: smooth; overflow-x: hidden; }
+    ::selection { background: #b8503a20; color: #2c2520; }
+    body { -webkit-font-smoothing: antialiased; overflow-x: hidden; max-width: 100vw; }
+    .card { background: #faf8f5; border: 1px solid #e8e2d9; border-radius: 16px; }
+    .card-inset { background: #f5f1eb; border: 1px solid #eee9e1; border-radius: 12px; }
+    .shadow-card { box-shadow: 0 1px 2px rgba(44,37,32,0.03), 0 4px 16px rgba(44,37,32,0.03); }
+    .shadow-card-lg { box-shadow: 0 2px 4px rgba(44,37,32,0.04), 0 8px 24px rgba(44,37,32,0.05); }
+    .btn-primary { background: #b8503a; color: white; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+    .btn-primary:hover { background: #973f2d; box-shadow: 0 4px 12px #b8503a28; transform: translateY(-1px); }
+    .btn-secondary { background: #faf8f5; border: 1px solid #e8e2d9; color: #6b5e52; transition: all 0.15s ease; }
+    .btn-secondary:hover { background: #f5f1eb; border-color: #d5cdc2; color: #2c2520; }
+    .input-field {
+      background: #f5f1eb;
+      border: 1px solid #e8e2d9;
+      transition: all 0.15s ease;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .input-field:focus {
+      outline: none;
+      border-color: #b8503a66;
+      box-shadow: 0 0 0 3px #b8503a12;
+      background: #faf8f5;
+    }
+    .tag-pill { background: #f5f1eb; border: 1px solid #e8e2d9; color: #6b5e52; transition: all 0.15s; }
+    .tab-active { background: #faf8f5; color: #2c2520; box-shadow: 0 1px 2px rgba(0,0,0,0.04); border: 1px solid #e8e2d9; }
+    .tab-idle { color: #9a8d80; }
+    .tab-idle:hover { color: #6b5e52; }
+    .method-get { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+    .method-post { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+    .code-block {
+      background: #25201c;
+      color: #ede8e0;
+      border: 1px solid #3c342d;
+      border-radius: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      max-width: 100%;
+      position: relative;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .code-block pre {
+      tab-size: 2;
+      overflow-x: auto;
+      max-width: 100%;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .code-block::-webkit-scrollbar,
+    .code-block pre::-webkit-scrollbar,
+    pre::-webkit-scrollbar,
+    .overflow-x-auto::-webkit-scrollbar {
+      display: none;
+      width: 0;
+      height: 0;
+    }
+    pre,
+    .overflow-x-auto {
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .code-kw { color: #e5987d; }
+    .code-str { color: #a3d9a5; }
+    .code-num { color: #ffd166; }
+    .code-comment { color: #8a7c70; }
+    .code-prop { color: #93c5fd; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { animation: spin 0.7s linear infinite; }
+    section[id] {
+      scroll-margin-top: 76px;
+    }
+    .sidebar-link {
+      transition: all 0.15s ease;
+      border-left: 2px solid transparent;
+    }
+    .sidebar-link:hover, .sidebar-link.active {
+      color: #b8503a;
+      background: #b8503a0a;
+      border-left-color: #b8503a;
+    }
+    @media (min-width: 1024px) {
+      .sidebar-col {
+        position: fixed;
+        top: 58px;
+        bottom: 0;
+        width: 260px;
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        overflow-y: auto;
+        scrollbar-width: none;
+      }
+      .sidebar-col::-webkit-scrollbar {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen font-sans" style="background: #f5f1eb; color: #2c2520;">
+
+  <!-- Navbar (Fixed at top) -->
+  <nav class="fixed top-0 left-0 right-0 z-40 border-b" style="background: rgba(250,248,245,0.92); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-color: #e8e2d9;">
+    <div class="max-w-6xl mx-auto px-4 sm:px-5 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-2.5 sm:gap-3">
+        <!-- Mobile Sidebar Toggle Button -->
+        <button onclick="toggleMobileSidebar()" id="mobileMenuBtn" class="lg:hidden w-8 h-8 rounded-lg flex items-center justify-center text-xs btn-secondary cursor-pointer" aria-label="Toggle navigation menu">
+          <i class="fa-solid fa-bars" id="mobileMenuIcon"></i>
+        </button>
+        <a href="/" class="flex items-center gap-2.5 sm:gap-3 group text-decoration-none">
+          <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm transition-transform group-hover:scale-105" style="background: #b8503a;">
+            <i class="fa-brands fa-linkedin-in text-sm"></i>
+          </div>
+          <div>
+            <span class="font-serif text-lg leading-tight block" style="color: #2c2520;">LinkFetch</span>
+          </div>
+        </a>
+      </div>
+      <div class="flex items-center gap-2 sm:gap-3">
+        <a href="/" class="flex items-center text-xs font-medium px-3.5 py-1.5 rounded-lg border transition btn-secondary">
+          <span>Web Playground</span>
+        </a>
+        <a href="/openapi.json" target="_blank" class="hidden sm:flex items-center text-xs font-medium px-3 py-1.5 rounded-lg border transition btn-secondary">
+          <span>OpenAPI JSON</span>
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Mobile Navigation Drawer -->
+  <div id="mobileSidebarBackdrop" class="fixed inset-0 z-50 bg-[#2c2520]/40 backdrop-blur-sm lg:hidden hidden transition-opacity duration-300 opacity-0" onclick="closeMobileSidebar()">
+    <div id="mobileSidebarPanel" class="fixed top-0 bottom-0 left-0 w-[280px] max-w-[85vw] h-full shadow-2xl p-5 overflow-y-auto space-y-6 transform -translate-x-full transition-transform duration-300 ease-in-out" style="background: #faf8f5; border-right: 1px solid #e8e2d9;" onclick="event.stopPropagation()">
+      <!-- Mobile Drawer Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-[#e8e2d9]">
+        <div class="flex items-center gap-2.5">
+          <div class="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs" style="background: #b8503a;">
+            <i class="fa-brands fa-linkedin-in"></i>
+          </div>
+          <span class="font-serif text-base font-medium" style="color: #2c2520;">LinkFetch</span>
+        </div>
+        <button onclick="closeMobileSidebar()" class="w-7 h-7 rounded-lg flex items-center justify-center text-xs btn-secondary cursor-pointer" aria-label="Close navigation menu">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Navigation Links -->
+      <div class="space-y-5">
+        <div>
+          <h3 class="text-[10px] font-bold uppercase tracking-wider mb-2.5" style="color: #9a8d80;">Overview</h3>
+          <ul class="space-y-1 text-xs">
+            <li><a href="#getting-started" onclick="closeMobileSidebar()" class="sidebar-link mobile-sidebar-link block px-2.5 py-2 rounded-md font-medium text-ink-secondary">Getting Started</a></li>
+            <li><a href="#architecture" onclick="closeMobileSidebar()" class="sidebar-link mobile-sidebar-link block px-2.5 py-2 rounded-md font-medium text-ink-secondary">Architecture & Routing</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <h3 class="text-[10px] font-bold uppercase tracking-wider mb-2.5" style="color: #9a8d80;">Endpoints</h3>
+          <ul class="space-y-1 text-xs">
+            <li>
+              <a href="#endpoint-post-profile" onclick="closeMobileSidebar()" class="sidebar-link mobile-sidebar-link flex items-center justify-between px-2.5 py-2 rounded-md font-medium text-ink-secondary">
+                <span>Extract Profile</span>
+                <span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded method-post">POST</span>
+              </a>
+            </li>
+            <li>
+              <a href="#endpoint-get-profile" onclick="closeMobileSidebar()" class="sidebar-link mobile-sidebar-link flex items-center justify-between px-2.5 py-2 rounded-md font-medium text-ink-secondary">
+                <span>Extract Profile</span>
+                <span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded method-get">GET</span>
+              </a>
+            </li>
+            <li>
+              <a href="#endpoint-health" onclick="closeMobileSidebar()" class="sidebar-link mobile-sidebar-link flex items-center justify-between px-2.5 py-2 rounded-md font-medium text-ink-secondary">
+                <span>Health Check</span>
+                <span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded method-get">GET</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+
+        <div>
+          <h3 class="text-[10px] font-bold uppercase tracking-wider mb-2.5" style="color: #9a8d80;">Schemas</h3>
+          <ul class="space-y-1 text-xs">
+            <li><a href="#schema-profiledata" onclick="closeMobileSidebar()" class="sidebar-link mobile-sidebar-link block px-2.5 py-2 rounded-md font-medium text-ink-secondary">ProfileData</a></li>
+            <li><a href="#schema-errors" onclick="closeMobileSidebar()" class="sidebar-link mobile-sidebar-link block px-2.5 py-2 rounded-md font-medium text-ink-secondary">Errors & Status Codes</a></li>
+          </ul>
+        </div>
+
+        <!-- Base URL Card in Drawer -->
+        <div class="card-inset p-3 text-xs">
+          <span class="text-[10px] font-bold uppercase tracking-wider" style="color: #9a8d80;">Base URL</span>
+          <div class="flex items-center justify-between gap-2 mt-1.5 p-2 rounded-lg bg-white border border-[#e8e2d9] font-mono text-[11px]" style="color: #b8503a;">
+            <span id="mobileBaseUrlText" class="truncate">http://localhost:8000/api/v1</span>
+            <button onclick="copyBaseUrl()" class="text-xs hover:text-ink transition flex-shrink-0" title="Copy Base URL">
+              <i class="fa-regular fa-copy"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-6xl mx-auto px-4 sm:px-5 pt-[58px] relative flex flex-col lg:flex-row gap-8 min-w-0">
+
+    <!-- Left Sidebar (True Fixed Viewport Position) -->
+    <aside class="hidden lg:block w-[260px] flex-shrink-0">
+      <div class="sidebar-col space-y-6">
+        <div class="card p-4 shadow-card">
+          <h3 class="text-[10px] font-bold uppercase tracking-wider mb-3" style="color: #9a8d80;">Overview</h3>
+          <ul class="space-y-1 text-xs">
+            <li><a href="#getting-started" class="sidebar-link block px-2.5 py-1.5 rounded-md font-medium text-ink-secondary">Getting Started</a></li>
+            <li><a href="#architecture" class="sidebar-link block px-2.5 py-1.5 rounded-md font-medium text-ink-secondary">Architecture & Routing</a></li>
+          </ul>
+
+          <h3 class="text-[10px] font-bold uppercase tracking-wider mt-5 mb-3" style="color: #9a8d80;">Endpoints</h3>
+          <ul class="space-y-1 text-xs">
+            <li>
+              <a href="#endpoint-post-profile" class="sidebar-link flex items-center justify-between px-2.5 py-1.5 rounded-md font-medium text-ink-secondary">
+                <span>Extract Profile</span>
+                <span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded method-post">POST</span>
+              </a>
+            </li>
+            <li>
+              <a href="#endpoint-get-profile" class="sidebar-link flex items-center justify-between px-2.5 py-1.5 rounded-md font-medium text-ink-secondary">
+                <span>Extract Profile</span>
+                <span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded method-get">GET</span>
+              </a>
+            </li>
+            <li>
+              <a href="#endpoint-health" class="sidebar-link flex items-center justify-between px-2.5 py-1.5 rounded-md font-medium text-ink-secondary">
+                <span>Health Check</span>
+                <span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded method-get">GET</span>
+              </a>
+            </li>
+          </ul>
+
+          <h3 class="text-[10px] font-bold uppercase tracking-wider mt-5 mb-3" style="color: #9a8d80;">Schemas</h3>
+          <ul class="space-y-1 text-xs">
+            <li><a href="#schema-profiledata" class="sidebar-link block px-2.5 py-1.5 rounded-md font-medium text-ink-secondary">ProfileData</a></li>
+            <li><a href="#schema-errors" class="sidebar-link block px-2.5 py-1.5 rounded-md font-medium text-ink-secondary">Errors & Status Codes</a></li>
+          </ul>
+        </div>
+
+        <!-- Base URL Card -->
+        <div class="card-inset p-3.5 text-xs">
+          <span class="text-[10px] font-bold uppercase tracking-wider" style="color: #9a8d80;">Base URL</span>
+          <div class="flex items-center justify-between gap-2 mt-1.5 p-2 rounded-lg bg-white border border-[#e8e2d9] font-mono text-[11px]" style="color: #b8503a;">
+            <span id="baseUrlText">http://localhost:8000/api/v1</span>
+            <button onclick="copyBaseUrl()" class="text-xs hover:text-ink transition" title="Copy Base URL">
+              <i class="fa-regular fa-copy" id="copyBaseIcon"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Documentation Content -->
+    <main class="flex-1 min-w-0 space-y-12 pt-8 pb-32">
+
+        <!-- Hero Section: Getting Started -->
+        <section id="getting-started" class="space-y-4">
+          <div class="space-y-3 mb-6">
+            <h2 class="font-serif leading-[1.1]" style="font-size: clamp(2rem, 4vw, 2.75rem); color: #2c2520;">
+              API Reference.<br><em style="color: #b8503a;">Engineered with precision.</em>
+            </h2>
+            <p class="text-[15px] leading-relaxed max-w-2xl" style="color: #6b5e52;">
+              A production-grade, reverse-engineered LinkedIn Profile Extraction API supporting <strong>Authenticated Voyager REST/Dash APIs</strong> and <strong>Zero-Cookie Public JSON-LD fallback</strong>.
+            </p>
+          </div>
+        </section>
+
+        <!-- Architecture & Routing Section -->
+        <section id="architecture" class="space-y-4 pt-4 border-t" style="border-color: #e8e2d9;">
+          <div>
+            <h3 class="font-serif text-2xl mb-1" style="color: #2c2520;">Architecture & Dual-Engine Routing</h3>
+            <p class="text-xs leading-relaxed" style="color: #6b5e52;">Enterprise-ready scraping infrastructure with automatic fallback and bot-bypass.</p>
+          </div>
+
+          <!-- Architecture Feature Grid -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+            <div class="card p-4 shadow-card">
+              <div class="w-8 h-8 rounded-lg flex items-center justify-center text-sm mb-3" style="background: #b8503a15; color: #b8503a;">
+                <i class="fa-solid fa-bolt"></i>
+              </div>
+              <h4 class="font-semibold text-sm mb-1" style="color: #2c2520;">Voyager REST-li</h4>
+              <p class="text-xs leading-relaxed" style="color: #6b5e52;">Queries LinkedIn's internal graph API with TLS browser fingerprinting in ~250ms.</p>
+            </div>
+
+            <div class="card p-4 shadow-card">
+              <div class="w-8 h-8 rounded-lg flex items-center justify-center text-sm mb-3" style="background: #0284c715; color: #0284c7;">
+                <i class="fa-solid fa-shield-halved"></i>
+              </div>
+              <h4 class="font-semibold text-sm mb-1" style="color: #2c2520;">Zero-Cookie Mode</h4>
+              <p class="text-xs leading-relaxed" style="color: #6b5e52;">Automatic fallback parsing Schema.org JSON-LD & meta tags when cookies are absent.</p>
+            </div>
+
+            <div class="card p-4 shadow-card">
+              <div class="w-8 h-8 rounded-lg flex items-center justify-center text-sm mb-3" style="background: #16a34a15; color: #16a34a;">
+                <i class="fa-solid fa-database"></i>
+              </div>
+              <h4 class="font-semibold text-sm mb-1" style="color: #2c2520;">LRU Memory Cache</h4>
+              <p class="text-xs leading-relaxed" style="color: #6b5e52;">High-efficiency TTL in-memory caching with jitter rate limiting to prevent throttling.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ENDPOINT 1: POST /api/v1/profile -->
+        <section id="endpoint-post-profile" class="space-y-4 pt-4 border-t" style="border-color: #e8e2d9;">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5">
+              <span class="px-2.5 py-1 text-xs font-bold rounded-lg method-post font-mono">POST</span>
+              <code class="text-base font-semibold font-mono" style="color: #2c2520;">/api/v1/profile</code>
+            </div>
+            <span class="text-xs font-medium px-2.5 py-1 rounded-md card-inset" style="color: #6b5e52;">application/json</span>
+          </div>
+
+          <p class="text-sm leading-relaxed" style="color: #6b5e52;">
+            Extracts full structured profile data from a JSON request body. Accepts any valid profile URL or vanity username.
+          </p>
+
+          <!-- Interactive Playground Card -->
+          <div class="card shadow-card p-4 sm:p-5 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <span class="text-xs font-bold uppercase tracking-wider" style="color: #9a8d80;">Live Interactive Request</span>
+              <span class="text-[11px] font-medium whitespace-nowrap flex items-center gap-1" style="color: #b8503a;"><i class="fa-solid fa-circle-dot text-[9px]"></i>Live Sandbox</span>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-2.5">
+              <input 
+                type="text" 
+                id="postInput" 
+                value="" 
+                placeholder="Enter username or https://www.linkedin.com/in/username"
+                class="w-full sm:flex-1 min-w-0 px-3.5 py-2.5 input-field rounded-xl font-mono text-xs" 
+                style="color: #2c2520;"
+              >
+              <button 
+                onclick="executePostTest()" 
+                id="postTestBtn"
+                class="btn-primary px-5 py-2.5 rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
+              >
+                <i class="fa-solid fa-paper-plane text-[10px]"></i>
+                <span>Send Request</span>
+              </button>
+            </div>
+
+            <!-- Live Output Area -->
+            <div id="postOutputContainer" class="hidden space-y-2">
+              <div class="flex flex-wrap items-center justify-between gap-2 text-xs pt-2" style="color: #9a8d80;">
+                <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+                  <span id="postStatusBadge" class="px-2 py-0.5 rounded font-mono font-bold text-[11px] whitespace-nowrap">200 OK</span>
+                  <span id="postLatency" class="font-mono text-[11px] whitespace-nowrap">-- ms</span>
+                  <span id="postStrategy" class="font-mono text-[11px] text-rust font-semibold whitespace-nowrap">--</span>
+                </div>
+                <button onclick="copyOutput('postJsonPre')" class="text-xs hover:text-ink transition flex items-center gap-1 whitespace-nowrap cursor-pointer">
+                  <i class="fa-regular fa-copy text-[10px]"></i> Copy
+                </button>
+              </div>
+              <div class="code-block p-4 overflow-x-auto max-h-96">
+                <pre id="postJsonPre"><code class="text-xs">// Response will appear here...</code></pre>
+              </div>
+            </div>
+
+            <!-- Code Snippet Tabs -->
+            <div class="pt-2 border-t" style="border-color: #eee9e1;">
+              <div class="flex flex-wrap items-center justify-between gap-2.5 mb-2.5">
+                <span class="text-[11px] font-bold uppercase tracking-wider whitespace-nowrap" style="color: #9a8d80;">Example Request</span>
+                <div class="flex items-center gap-1 text-xs flex-wrap">
+                  <button onclick="switchSnippet('post', 'curl')" id="tab-post-curl" class="px-2.5 py-1 rounded-md text-[11px] font-medium tab-active whitespace-nowrap">cURL</button>
+                  <button onclick="switchSnippet('post', 'python')" id="tab-post-python" class="px-2.5 py-1 rounded-md text-[11px] font-medium tab-idle whitespace-nowrap">Python</button>
+                  <button onclick="switchSnippet('post', 'js')" id="tab-post-js" class="px-2.5 py-1 rounded-md text-[11px] font-medium tab-idle whitespace-nowrap">JavaScript</button>
+                </div>
+              </div>
+
+              <!-- cURL -->
+              <div id="snippet-post-curl" class="code-block p-3.5 relative overflow-hidden">
+                <button onclick="copySnippet('snippet-post-curl-code')" class="absolute top-3 right-3 text-xs text-neutral-400 hover:text-white transition z-10">
+                  <i class="fa-regular fa-copy"></i>
+                </button>
+                <pre id="snippet-post-curl-code" class="overflow-x-auto pr-8"><code>curl -X POST "http://localhost:8000/api/v1/profile" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.linkedin.com/in/username"}'</code></pre>
+              </div>
+
+              <!-- Python -->
+              <div id="snippet-post-python" class="code-block p-3.5 relative overflow-hidden hidden">
+                <button onclick="copySnippet('snippet-post-python-code')" class="absolute top-3 right-3 text-xs text-neutral-400 hover:text-white transition z-10">
+                  <i class="fa-regular fa-copy"></i>
+                </button>
+                <pre id="snippet-post-python-code" class="overflow-x-auto pr-8"><code><span class="code-kw">import</span> requests
+
+response = requests.post(
+    <span class="code-str">"http://localhost:8000/api/v1/profile"</span>,
+    json={<span class="code-str">"url"</span>: <span class="code-str">"https://www.linkedin.com/in/username"</span>}
+)
+profile_data = response.json()
+print(profile_data[<span class="code-str">"data"</span>][<span class="code-str">"full_name"</span>])</code></pre>
+              </div>
+
+              <!-- JS -->
+              <div id="snippet-post-js" class="code-block p-3.5 relative overflow-hidden hidden">
+                <button onclick="copySnippet('snippet-post-js-code')" class="absolute top-3 right-3 text-xs text-neutral-400 hover:text-white transition z-10">
+                  <i class="fa-regular fa-copy"></i>
+                </button>
+                <pre id="snippet-post-js-code" class="overflow-x-auto pr-8"><code><span class="code-kw">const</span> res = <span class="code-kw">await</span> fetch(<span class="code-str">"http://localhost:8000/api/v1/profile"</span>, {
+  method: <span class="code-str">"POST"</span>,
+  headers: { <span class="code-str">"Content-Type"</span>: <span class="code-str">"application/json"</span> },
+  body: JSON.stringify({ url: <span class="code-str">"https://www.linkedin.com/in/username"</span> })
+});
+<span class="code-kw">const</span> { data } = <span class="code-kw">await</span> res.json();
+console.log(data.full_name);</code></pre>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ENDPOINT 2: GET /api/v1/profile -->
+        <section id="endpoint-get-profile" class="space-y-4 pt-4 border-t" style="border-color: #e8e2d9;">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5">
+              <span class="px-2.5 py-1 text-xs font-bold rounded-lg method-get font-mono">GET</span>
+              <code class="text-base font-semibold font-mono" style="color: #2c2520;">/api/v1/profile</code>
+            </div>
+            <span class="text-xs font-medium px-2.5 py-1 rounded-md card-inset" style="color: #6b5e52;">Query Parameter</span>
+          </div>
+
+          <p class="text-sm leading-relaxed" style="color: #6b5e52;">
+            Convenience endpoint extracting profile data via query parameter. Useful for fast GET integrations and direct browser testing.
+          </p>
+
+          <!-- Parameters Table -->
+          <div class="card overflow-hidden shadow-card text-xs">
+            <div class="px-4 py-2.5 card-inset font-bold uppercase tracking-wider text-[10px]" style="color: #9a8d80;">Query Parameters</div>
+            <div class="overflow-x-auto w-full">
+              <table class="w-full text-left border-collapse min-w-[480px]">
+                <thead>
+                  <tr class="border-b" style="border-color: #eee9e1; color: #9a8d80;">
+                    <th class="py-2.5 px-4 font-semibold">Parameter</th>
+                    <th class="py-2.5 px-4 font-semibold">Type</th>
+                    <th class="py-2.5 px-4 font-semibold">Required</th>
+                    <th class="py-2.5 px-4 font-semibold">Description</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-[#eee9e1]" style="color: #6b5e52;">
+                  <tr>
+                    <td class="py-3 px-4 font-mono font-semibold" style="color: #b8503a;">url</td>
+                    <td class="py-3 px-4 font-mono">string</td>
+                    <td class="py-3 px-4"><span class="px-2 py-0.5 rounded text-[10px] font-bold" style="background:#fee2e2; color:#991b1b;">Required</span></td>
+                    <td class="py-3 px-4">LinkedIn profile URL or vanity ID (e.g. <code>username</code>, <code>/in/username</code>).</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Code Snippet -->
+          <div class="code-block p-3.5 relative overflow-hidden">
+            <button onclick="copySnippet('snippet-get-code')" class="absolute top-3 right-3 text-xs text-neutral-400 hover:text-white transition z-10">
+              <i class="fa-regular fa-copy"></i>
+            </button>
+            <pre id="snippet-get-code" class="overflow-x-auto pr-8"><code>curl -X GET "http://localhost:8000/api/v1/profile?url=username"</code></pre>
+          </div>
+        </section>
+
+        <!-- ENDPOINT 3: GET /api/v1/health -->
+        <section id="endpoint-health" class="space-y-4 pt-4 border-t" style="border-color: #e8e2d9;">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5">
+              <span class="px-2.5 py-1 text-xs font-bold rounded-lg method-get font-mono">GET</span>
+              <code class="text-base font-semibold font-mono" style="color: #2c2520;">/api/v1/health</code>
+            </div>
+            <span class="text-xs font-medium px-2.5 py-1 rounded-md card-inset" style="color: #6b5e52;">Diagnostics</span>
+          </div>
+
+          <p class="text-sm leading-relaxed" style="color: #6b5e52;">
+            Returns real-time service health, active LinkedIn session credentials validation, and in-memory LRU cache performance metrics.
+          </p>
+
+          <!-- Interactive Health Ping Card -->
+          <div class="card shadow-card p-4 sm:p-5 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2.5">
+              <span class="text-xs font-bold uppercase tracking-wider" style="color: #9a8d80;">Real-time Health Inspector</span>
+              <button 
+                onclick="executeHealthTest()" 
+                id="healthTestBtn"
+                class="btn-primary px-3.5 py-1.5 rounded-lg font-semibold text-xs flex items-center gap-1.5 cursor-pointer whitespace-nowrap flex-shrink-0"
+              >
+                <i class="fa-solid fa-heart-pulse text-[10px]"></i>
+                <span>Ping Health</span>
+              </button>
+            </div>
+
+            <div class="code-block p-3.5 overflow-x-auto">
+              <pre id="healthJsonPre"><code>// Click "Ping Health" to inspect live metrics...</code></pre>
+            </div>
+          </div>
+        </section>
+
+        <!-- SCHEMAS REFERENCE -->
+        <section id="schema-profiledata" class="space-y-6 pt-6 border-t" style="border-color: #e8e2d9;">
+          <div>
+            <h3 class="font-serif text-2xl mb-1" style="color: #2c2520;">Structured Data Models</h3>
+            <p class="text-xs leading-relaxed" style="color: #6b5e52;">Strongly-typed Pydantic v2 schemas returned by extraction endpoints.</p>
+          </div>
+
+          <!-- Model: ProfileData -->
+          <div class="card overflow-hidden shadow-card text-xs">
+            <div class="px-4 sm:px-5 py-3 card-inset flex flex-wrap items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <span class="font-mono font-bold text-sm" style="color: #2c2520;">ProfileData</span>
+                <span class="text-[10px] px-2 py-0.5 rounded font-mono" style="background: #e8e2d9; color: #6b5e52;">Object</span>
+              </div>
+              <span class="text-[11px] whitespace-nowrap" style="color: #9a8d80;">Root profile payload</span>
+            </div>
+            <div class="overflow-x-auto w-full">
+              <table class="w-full text-left border-collapse min-w-[500px]">
+                <thead>
+                  <tr class="border-b text-[11px]" style="border-color: #eee9e1; color: #9a8d80;">
+                    <th class="py-2.5 px-4 font-semibold">Field</th>
+                    <th class="py-2.5 px-4 font-semibold">Type</th>
+                    <th class="py-2.5 px-4 font-semibold">Description</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-[#eee9e1]" style="color: #6b5e52;">
+                  <tr>
+                    <td class="py-2.5 px-4 font-mono font-semibold" style="color: #b8503a;">public_id</td>
+                    <td class="py-2.5 px-4 font-mono text-[11px]">string</td>
+                    <td class="py-2.5 px-4">Vanity handle identifier (e.g. <code>username</code>).</td>
+                  </tr>
+                  <tr>
+                    <td class="py-2.5 px-4 font-mono font-semibold" style="color: #b8503a;">full_name</td>
+                    <td class="py-2.5 px-4 font-mono text-[11px]">string</td>
+                    <td class="py-2.5 px-4">Full display name of the member.</td>
+                  </tr>
+                  <tr>
+                    <td class="py-2.5 px-4 font-mono font-semibold" style="color: #b8503a;">headline</td>
+                    <td class="py-2.5 px-4 font-mono text-[11px]">string | null</td>
+                    <td class="py-2.5 px-4">Current role / tagline.</td>
+                  </tr>
+                  <tr>
+                    <td class="py-2.5 px-4 font-mono font-semibold" style="color: #b8503a;">profile_picture_url</td>
+                    <td class="py-2.5 px-4 font-mono text-[11px]">string | null</td>
+                    <td class="py-2.5 px-4">High-resolution vector avatar URL.</td>
+                  </tr>
+                  <tr>
+                    <td class="py-2.5 px-4 font-mono font-semibold" style="color: #b8503a;">background_picture_url</td>
+                    <td class="py-2.5 px-4 font-mono text-[11px]">string | null</td>
+                    <td class="py-2.5 px-4">Cover / header banner image URL.</td>
+                  </tr>
+                  <tr>
+                    <td class="py-2.5 px-4 font-mono font-semibold" style="color: #b8503a;">experience</td>
+                    <td class="py-2.5 px-4 font-mono text-[11px]">Array&lt;Position&gt;</td>
+                    <td class="py-2.5 px-4">Complete work history timeline with company logos.</td>
+                  </tr>
+                  <tr>
+                    <td class="py-2.5 px-4 font-mono font-semibold" style="color: #b8503a;">education</td>
+                    <td class="py-2.5 px-4 font-mono text-[11px]">Array&lt;Education&gt;</td>
+                    <td class="py-2.5 px-4">Degrees, schools, majors, and study dates.</td>
+                  </tr>
+                  <tr>
+                    <td class="py-2.5 px-4 font-mono font-semibold" style="color: #b8503a;">skills</td>
+                    <td class="py-2.5 px-4 font-mono text-[11px]">Array&lt;Skill&gt;</td>
+                    <td class="py-2.5 px-4">Extracted skills with endorsement counts.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ERRORS & STATUS CODES -->
+        <section id="schema-errors" class="space-y-4 pt-6 border-t" style="border-color: #e8e2d9;">
+          <div>
+            <h3 class="font-serif text-2xl mb-1" style="color: #2c2520;">HTTP Status Codes</h3>
+            <p class="text-xs leading-relaxed" style="color: #6b5e52;">Standard machine-readable error responses and diagnostic codes.</p>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div class="card p-3.5 shadow-card">
+              <div class="flex items-center gap-2 mb-1.5">
+                <span class="font-mono font-bold text-xs px-2 py-0.5 rounded" style="background: #dcfce7; color: #15803d;">200 OK</span>
+                <span class="font-semibold" style="color: #2c2520;">Success</span>
+              </div>
+              <p style="color: #6b5e52;">Profile successfully extracted and returned with structured metadata.</p>
+            </div>
+
+            <div class="card p-3.5 shadow-card">
+              <div class="flex items-center gap-2 mb-1.5">
+                <span class="font-mono font-bold text-xs px-2 py-0.5 rounded" style="background: #fef9c3; color: #854d0e;">400 Bad Request</span>
+                <span class="font-semibold" style="color: #2c2520;">Invalid URL</span>
+              </div>
+              <p style="color: #6b5e52;">Supplied URL or identifier could not be parsed into a valid LinkedIn vanity ID.</p>
+            </div>
+
+            <div class="card p-3.5 shadow-card">
+              <div class="flex items-center gap-2 mb-1.5">
+                <span class="font-mono font-bold text-xs px-2 py-0.5 rounded" style="background: #fee2e2; color: #991b1b;">403 Bot Block</span>
+                <span class="font-semibold" style="color: #2c2520;">Auth Wall (999)</span>
+              </div>
+              <p style="color: #6b5e52;">Profile requires authentication. Configure cookies in .env to enable deep extraction.</p>
+            </div>
+
+            <div class="card p-3.5 shadow-card">
+              <div class="flex items-center gap-2 mb-1.5">
+                <span class="font-mono font-bold text-xs px-2 py-0.5 rounded" style="background: #fee2e2; color: #991b1b;">404 Not Found</span>
+                <span class="font-semibold" style="color: #2c2520;">Profile Not Found</span>
+              </div>
+              <p style="color: #6b5e52;">LinkedIn profile handle does not exist or has been deleted.</p>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const origin = window.location.origin;
+      const el = document.getElementById('baseUrlText');
+      if (el) el.textContent = `${origin}/api/v1`;
+      const mEl = document.getElementById('mobileBaseUrlText');
+      if (mEl) mEl.textContent = `${origin}/api/v1`;
+
+      // ScrollSpy active link highlighting across desktop & mobile nav
+      const sections = document.querySelectorAll('main section[id]');
+      const navLinks = document.querySelectorAll('.sidebar-link');
+
+      function updateActiveNav() {
+        const atBottom = (window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - 90);
+        if (atBottom) {
+          setActiveLink('schema-errors');
+          return;
+        }
+
+        let currentId = '';
+        sections.forEach(section => {
+          const rect = section.getBoundingClientRect();
+          if (rect.top <= 200) {
+            currentId = section.getAttribute('id');
+          }
+        });
+
+        if (!currentId && sections.length > 0) {
+          currentId = sections[0].getAttribute('id');
+        }
+
+        setActiveLink(currentId);
+      }
+
+      function setActiveLink(targetId) {
+        navLinks.forEach(link => {
+          const href = link.getAttribute('href');
+          if (href === `#${targetId}`) {
+            link.classList.add('active');
+          } else {
+            link.classList.remove('active');
+          }
+        });
+      }
+
+      window.addEventListener('scroll', updateActiveNav, { passive: true });
+      updateActiveNav();
+    });
+
+    function openMobileSidebar() {
+      const backdrop = document.getElementById('mobileSidebarBackdrop');
+      const panel = document.getElementById('mobileSidebarPanel');
+      if (!backdrop || !panel) return;
+      backdrop.classList.remove('hidden');
+      void backdrop.offsetWidth;
+      backdrop.classList.remove('opacity-0');
+      backdrop.classList.add('opacity-100');
+      panel.classList.remove('-translate-x-full');
+      panel.classList.add('translate-x-0');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeMobileSidebar() {
+      const backdrop = document.getElementById('mobileSidebarBackdrop');
+      const panel = document.getElementById('mobileSidebarPanel');
+      if (!backdrop || !panel) return;
+      backdrop.classList.remove('opacity-100');
+      backdrop.classList.add('opacity-0');
+      panel.classList.remove('translate-x-0');
+      panel.classList.add('-translate-x-full');
+      document.body.style.overflow = '';
+      setTimeout(() => {
+        backdrop.classList.add('hidden');
+      }, 300);
+    }
+
+    function toggleMobileSidebar() {
+      const backdrop = document.getElementById('mobileSidebarBackdrop');
+      if (backdrop && (backdrop.classList.contains('hidden') || backdrop.classList.contains('opacity-0'))) {
+        openMobileSidebar();
+      } else {
+        closeMobileSidebar();
+      }
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeMobileSidebar();
+    });
+
+    function copyBaseUrl() {
+      const origin = window.location.origin + '/api/v1';
+      navigator.clipboard.writeText(origin).then(() => {
+        const icon = document.getElementById('copyBaseIcon');
+        icon.className = 'fa-solid fa-check text-green-600';
+        setTimeout(() => { icon.className = 'fa-regular fa-copy'; }, 1500);
+      });
+    }
+
+    function switchSnippet(ep, lang) {
+      ['curl', 'python', 'js'].forEach(l => {
+        const btn = document.getElementById(`tab-${ep}-${l}`);
+        const el = document.getElementById(`snippet-${ep}-${l}`);
+        if (btn) btn.className = l === lang ? 'px-2.5 py-1 rounded-md text-[11px] font-medium tab-active' : 'px-2.5 py-1 rounded-md text-[11px] font-medium tab-idle';
+        if (el) el.classList.toggle('hidden', l !== lang);
+      });
+    }
+
+    function copySnippet(id) {
+      const text = document.getElementById(id).innerText;
+      navigator.clipboard.writeText(text);
+    }
+
+    function copyOutput(id) {
+      const text = document.getElementById(id).innerText;
+      navigator.clipboard.writeText(text);
+    }
+
+    async function executePostTest() {
+      const val = document.getElementById('postInput').value.trim();
+      if (!val) return;
+
+      const btn = document.getElementById('postTestBtn');
+      const container = document.getElementById('postOutputContainer');
+      const pre = document.getElementById('postJsonPre');
+      const badge = document.getElementById('postStatusBadge');
+      const latencyEl = document.getElementById('postLatency');
+      const strategyEl = document.getElementById('postStrategy');
+
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-circle-notch spinner text-xs"></i> <span>Sending...</span>';
+      container.classList.remove('hidden');
+      pre.innerHTML = '<code>Sending request to /api/v1/profile...</code>';
+
+      const t0 = performance.now();
+      try {
+        const res = await fetch('/api/v1/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: val })
+        });
+        const duration = Math.round(performance.now() - t0);
+        const data = await res.json();
+
+        latencyEl.textContent = `${duration}ms`;
+        strategyEl.textContent = data?.metadata?.strategy_used ? `via ${data.metadata.strategy_used}` : '';
+
+        if (res.ok) {
+          badge.textContent = '200 OK';
+          badge.style.background = '#dcfce7';
+          badge.style.color = '#15803d';
+        } else {
+          badge.textContent = `${res.status} Error`;
+          badge.style.background = '#fee2e2';
+          badge.style.color = '#991b1b';
+        }
+
+        pre.innerHTML = `<code>${JSON.stringify(data, null, 2)}</code>`;
+      } catch (err) {
+        badge.textContent = 'Network Error';
+        badge.style.background = '#fee2e2';
+        badge.style.color = '#991b1b';
+        pre.innerHTML = `<code>Error connecting to API: ${err.message}</code>`;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-paper-plane text-[10px]"></i> <span>Send Request</span>';
+      }
+    }
+
+    async function executeHealthTest() {
+      const btn = document.getElementById('healthTestBtn');
+      const pre = document.getElementById('healthJsonPre');
+
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-circle-notch spinner text-xs"></i> <span>Pinging...</span>';
+
+      try {
+        const res = await fetch('/api/v1/health');
+        const data = await res.json();
+        pre.innerHTML = `<code>${JSON.stringify(data, null, 2)}</code>`;
+      } catch (err) {
+        pre.innerHTML = `<code>Failed to ping health: ${err.message}</code>`;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-heart-pulse text-[10px]"></i> <span>Ping Health</span>';
+      }
+    }
+  </script>
+</body>
+</html>

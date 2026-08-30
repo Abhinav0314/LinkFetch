@@ -1,0 +1,15 @@
+services:
+  api:
+    build: .
+    container_name: linkedin_profile_api
+    ports:
+      - "8000:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - CACHE_TTL_SECONDS=3600
+      - LINKEDIN_LI_AT=${LINKEDIN_LI_AT:-}
+      - LINKEDIN_JSESSIONID=${LINKEDIN_JSESSIONID:-}
+    restart: unless-stopped
